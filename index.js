@@ -65,7 +65,7 @@ async function callAI(question) {
   if (!apiKey) throw new Error("AI API key not configured");
 
   const url =
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-001:generateContent";
 
   const resp = await axios.post(
     `${url}?key=${apiKey}`,
@@ -217,8 +217,9 @@ app.post("/bfhl", async (req, res) => {
 
     // ---------- AI ----------
     if (key === "AI") {
-      const q = body.AI;
-      if (typeof q !== "string" || !q.trim()) {
+      const question = body[key];
+      
+      if (typeof question !== "string" || !question.trim()) {
         return res.status(400).json({
           is_success: false,
           official_email: OFFICIAL_EMAIL,
@@ -226,28 +227,35 @@ app.post("/bfhl", async (req, res) => {
         });
       }
 
-      let answer = "";
-      const lower = q.toLowerCase();
+      try {
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+          {
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Answer the following question using ONLY ONE WORD.\nQuestion: ${question}`
+                  }
+                ]
+              }
+            ]
+          }
+        );
 
-      // Hard-coded for the test question
-      if (lower.includes("capital") && lower.includes("maharashtra")) {
-        answer = "Mumbai";
-      } else {
-        try {
-          answer = await callAI(q);
-        } catch (err) {
-          console.error("AI error:", err.message);
-          answer = "Unknown";
-        }
+        const answer =
+          response.data.candidates[0].content.parts[0].text;
+
+        data = answer.trim().split(/\s+/)[0];
+      } catch (err) {
+        console.error("AI error:", err.message);
+        data = "Unknown";
       }
-
-      const singleWord =
-        answer.split(/\s+/)[0].replace(/[^A-Za-z]/g, "") || "Unknown";
-
+      
       return res.status(200).json({
         is_success: true,
         official_email: OFFICIAL_EMAIL,
-        data: singleWord,
+        data,
       });
     }
 
